@@ -44,25 +44,36 @@ class FrameGrabberThread(QThread):
             if frame is None: self.msleep(10); continue
             self._n += 1
             if self._n % self._every: continue
-            ok, infer, det, out = self._proc(frame)
+            ok, infer, det, conf, out = self._proc(frame)
             if ok:
                 self._t_infer += infer; self._det += det
                 self.frame_processed.emit(self._to_qimage(out))
-                self.processing_complete.emit({"detection_count": det,
-                                               "inference_time": infer*1000,
-                                               "fps": 1.0/(infer+1e-3)})
+                # 构建stats字典并发送处理完成信号
+                stats = {
+                    'detection_count': det,
+                    'avg_confidence': conf,
+                    'inference_time': infer * 1000,  # 转换为毫秒
+                    'fps': 1.0/(infer+1e-3)
+                }
+                self.processing_complete.emit(stats)
         self.finished.emit()
 
     # -------------- 内部辅助 --------------
     def _proc(self, frame):
-        if self.yolo is None: return True, 0.0, 0, frame
+        if self.yolo is None: return True, 0.0, 0, 0.0, frame
         try:
             t0 = time.time()
             r = self.yolo.process_frame(frame)
             infer = time.time() - t0
-            return True, infer, r.get("detection_count", 0), r.get("image", frame)
+            # 从stats字典中获取检测数和置信度
+            stats = r.get("stats", {})
+            detection_count = stats.get("detection_count", 0)
+            confidence = stats.get("avg_confidence", 0.0)
+            # 获取处理后的图像
+            processed_image = r.get("image", frame)
+            return True, infer, detection_count, confidence, processed_image
         except Exception as e:
-            self.error_occurred.emit(str(e)); return False, 0.0, 0, frame
+            self.error_occurred.emit(str(e)); return False, 0.0, 0, 0.0, frame
     @staticmethod
     def _to_qimage(arr):
         rgb = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)

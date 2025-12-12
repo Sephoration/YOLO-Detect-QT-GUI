@@ -1,12 +1,17 @@
 """
 软件界面_ui部分
 保留单独运行能力、以方便测试
+定义和布局UI组件
+提供用户交互接口
+显示数据和状态
+触发简单事件（菜单点击、按钮点击）
+错误处理应该放在控制器中
 """
 
 import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QSlider, QPushButton, QGroupBox, 
-                               QToolBar, QSizePolicy, QMenu, QScrollArea, QErrorMessage)
+                               QToolBar, QSizePolicy, QMenu, QScrollArea)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
 from collections import OrderedDict
@@ -406,18 +411,6 @@ class LeftDisplayPanel(QWidget):
                 color: #aaaaaa;
                 background-color: rgba(40, 40, 40, 0.7);
                 border: 1px solid rgba(100, 100, 100, 0.2);
-            }}
-            /* 文件名标签样式 */
-            QLabel#FilenameLabel {{
-                background-color: transparent;
-                color: white;
-                padding: 0;
-                border: none;
-                border-radius: 0;
-                font-family: 'Microsoft YaHei';
-                font-size: 11px;
-                font-weight: bold;
-                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
             }}
         """.format(
             6,  # 进度条槽高度
@@ -851,7 +844,7 @@ class RightControlPanel(QWidget):
         """更新统计信息显示"""
         self.detection_count_label.setText(f"检测数: {detection_count}")
         self.confidence_label.setText(f"置信度: {confidence:.2f}")
-        self.inference_time_label.setText(f"推理时间: {inference_time}ms")
+        self.inference_time_label.setText(f"推理时间: {inference_time:.2f}ms")
         self.fps_label.setText(f"FPS: {fps:.1f}")
     
     def get_parameters(self):
@@ -885,23 +878,19 @@ class RightControlPanel(QWidget):
 # 功能：整合左侧展示区和右侧控制区，提供菜单栏和工具栏
 # ============================================================================
 class YOLOMainWindowUI(QMainWindow):
-    """主窗口UI类"""
+    """主窗口UI类 - 简化版，只负责UI展示"""
     
-    # 定义信号
+    # 只保留与菜单直接相关的信号
     file_menu_init = Signal()
     file_menu_save_as = Signal()
     file_menu_save = Signal()
     file_menu_exit = Signal()
-    
     model_load = Signal()
     image_open = Signal()
     video_open = Signal()
     camera_open = Signal()
-    
     help_menu_about = Signal()
     help_menu_manual = Signal()
-    
-    left_panel_play_pause = Signal()
     
     def __init__(self):
         super().__init__()
@@ -969,19 +958,19 @@ class YOLOMainWindowUI(QMainWindow):
         toolbar.addAction(self.btn_file)
         
         self.btn_model = QAction("打开模型", self)
-        self.btn_model.triggered.connect(self.load_model)
+        self.btn_model.triggered.connect(self.model_load.emit)  # 直接触发信号
         toolbar.addAction(self.btn_model)
         
         self.btn_image = QAction("打开图片", self)
-        self.btn_image.triggered.connect(self.image_open.emit)
+        self.btn_image.triggered.connect(self.image_open.emit)  # 直接触发信号
         toolbar.addAction(self.btn_image)
         
         self.btn_video = QAction("打开视频", self)
-        self.btn_video.triggered.connect(self.load_video)
+        self.btn_video.triggered.connect(self.video_open.emit)  # 直接触发信号
         toolbar.addAction(self.btn_video)
         
         self.btn_camera = QAction("打开摄像头", self)
-        self.btn_camera.triggered.connect(self.camera_open.emit)
+        self.btn_camera.triggered.connect(self.camera_open.emit)  # 直接触发信号
         toolbar.addAction(self.btn_camera)
         
         self.btn_help = QAction("帮助", self)
@@ -993,38 +982,20 @@ class YOLOMainWindowUI(QMainWindow):
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         toolbar.addWidget(spacer)
     
-    def load_model(self, model_path=None):
-        """加载模型"""
-        try:
-            # 直接触发外部信号，让控制器处理
-            self.model_load.emit()  # ✅ 调用已定义的信号
-        except Exception as e:
-            # 统一弹出错误消息
-            error_dialog = QErrorMessage(self)
-            error_dialog.setWindowTitle("模型加载失败")
-            error_dialog.showMessage(f"加载模型时发生错误: {str(e)}")
-    
-    def load_video(self, video_path=None):
-        """加载视频"""
-        try:
-            # 直接触发外部信号，让控制器处理
-            self.video_open.emit()  # ✅ 调用已定义的信号
-        except Exception as e:
-            # 统一弹出错误消息
-            error_dialog = QErrorMessage(self)
-            error_dialog.setWindowTitle("视频加载失败")
-            error_dialog.showMessage(f"打开视频时发生错误: {str(e)}")
-    
-    def stop_inference(self):
-        """停止推理"""
-        try:
-            # 触发信号，让控制器处理实际的停止逻辑
-            self._on_stop_inference()
-        except Exception as e:
-            # 统一弹出错误消息
-            error_dialog = QErrorMessage(self)
-            error_dialog.setWindowTitle("停止推理失败")
-            error_dialog.showMessage(f"停止推理线程时发生错误: {str(e)}")
+    def _setup_signals(self):
+        """设置信号连接 - 简化版本，只暴露子组件信号"""
+        # 子组件的信号直接暴露给外部
+        # 外部控制器可以这样连接：
+        # controller.ui.left_panel_play_pause.connect(handler)
+        self.left_panel_play_pause = self.left_panel.play_pause_clicked
+        self.progress_changed = self.left_panel.progress_changed
+        self.iou_changed = self.right_panel.iou_changed
+        self.confidence_changed = self.right_panel.confidence_changed
+        self.delay_changed = self.right_panel.delay_changed
+        self.line_width_changed = self.right_panel.line_width_changed
+        self.save_screenshot = self.right_panel.save_screenshot
+        self.start_inference = self.right_panel.start_inference
+        self.stop_inference = self.right_panel.stop_inference
     
     def _show_file_menu(self):
         """显示文件下拉菜单"""
@@ -1074,69 +1045,6 @@ class YOLOMainWindowUI(QMainWindow):
         
         # fallback: 在窗口左上角显示
         help_menu.exec_(self.mapToGlobal(self.rect().topLeft()))
-    
-    def _setup_signals(self):
-        """设置信号连接"""
-        # 连接左右面板的信号
-        self.left_panel.play_pause_clicked.connect(self._on_play_pause_clicked)
-        self.left_panel.progress_changed.connect(self._on_progress_changed)
-        self.right_panel.start_inference.connect(self._on_start_inference)
-        self.right_panel.stop_inference.connect(self._on_stop_inference)
-        self.right_panel.save_screenshot.connect(self._on_save_screenshot)
-        self.right_panel.iou_changed.connect(self._on_iou_changed)
-        self.right_panel.confidence_changed.connect(self._on_confidence_changed)
-        self.right_panel.delay_changed.connect(self._on_delay_changed)
-        self.right_panel.line_width_changed.connect(self._on_line_width_changed)
-    
-    # ===== 内部信号处理方法 =====
-    
-    def _on_play_pause_clicked(self):
-        """播放/暂停按钮点击处理"""
-        self._forward_signal('left_panel_play_pause')
-    
-    def _on_progress_changed(self, value):
-        """进度条值改变处理"""
-        self._forward_signal('progress_changed', value)
-    
-    def _on_start_inference(self):
-        """开始推理处理"""
-        self._forward_signal('start_inference')
-    
-    def _on_stop_inference(self):
-        """停止推理处理"""
-        self._forward_signal('stop_inference')
-    
-    def _on_save_screenshot(self):
-        """保存截图处理"""
-        self._forward_signal('save_screenshot')
-    
-    def _on_iou_changed(self, value):
-        """IOU阈值改变处理"""
-        self._forward_signal('iou_changed', value)
-    
-    def _on_confidence_changed(self, value):
-        """置信度阈值改变处理"""
-        self._forward_signal('confidence_changed', value)
-    
-    def _on_delay_changed(self, value):
-        """延迟时间改变处理"""
-        self._forward_signal('delay_changed', value)
-    
-    def _on_line_width_changed(self, value):
-        """线宽改变处理"""
-        self._forward_signal('line_width_changed', value)
-    
-    # 信号转发方法 - 简化为统一的_forward_signal方法
-    def _forward_signal(self, signal_name, *args):
-        """通用信号转发方法
-        
-        Args:
-            signal_name: 信号名称
-            *args: 信号参数
-        """
-        signal = getattr(self, signal_name, None)
-        if signal and isinstance(signal, Signal):
-            signal.emit(*args)
     
     # ===== 公共接口方法 =====
     
@@ -1217,7 +1125,7 @@ if __name__ == "__main__":
     
     # 测试信息输出
     print("=" * 60)
-    print("YOLO GUI界面测试 - 方案B：直接堆叠布局")
+    print("YOLO GUI界面测试 - 重构版：简化信号传递")
     print("=" * 60)
     
     left_panel = window.get_left_panel()
@@ -1228,6 +1136,7 @@ if __name__ == "__main__":
     print("3. 统计标签: 检测数、置信度、推理时间、FPS")
     print("4. 视频控制常驻显示，根据模式启用/禁用")
     print("5. 文件名标签作为叠加层显示")
+    print("6. 简化信号传递：子组件信号直接暴露")
     print("=" * 60)
     
     # 测试专用: 在单独运行UI时把显示区域变成白底并显示文件名，便于视觉校验

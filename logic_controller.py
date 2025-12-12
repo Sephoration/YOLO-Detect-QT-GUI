@@ -22,7 +22,6 @@ from baseDetect import baseDetect
 # 导入配置文件
 from config import AppConfig
 
-
 # 添加QMutexLocker辅助类
 class QMutexLocker:
     """用于简化QMutex的使用，类似于C++的QMutexLocker"""
@@ -529,9 +528,6 @@ class VideoPlayerThread(QThread):
                     self.cap = None
 
 
-# SimpleVideoPlayer类已被移除，使用VideoPlayerThread代替
-
-
 class YOLOMainController(QObject):
     """主逻辑协调控制器"""
     
@@ -576,8 +572,8 @@ class YOLOMainController(QObject):
         
         # 初始化UI状态
         self._init_ui_state()
-        # 设置信号连接
-        self._setup_connections()
+        # 连接信号
+        self._connect_signals()
         
         print("YOLO逻辑控制器初始化完成")
     
@@ -595,8 +591,8 @@ class YOLOMainController(QObject):
         # 设置控制按钮状态
         self.right_panel.set_control_state(False)
     
-    def _setup_connections(self):
-        """设置信号连接"""
+    def _connect_signals(self):
+        """连接UI暴露的信号，将错误处理放在控制器中"""
         # ===== 连接视频播放器信号 =====
         self.video_player.frame_ready.connect(self._on_player_frame)
         self.video_player.status_update.connect(self._on_status_update)
@@ -619,21 +615,27 @@ class YOLOMainController(QObject):
         self.ui.help_menu_manual.connect(self._on_help_manual)
         
         # ===== 主要功能信号 =====
-        self.ui.model_load.connect(self._on_model_load)
-        self.ui.image_open.connect(self._on_image_open)
-        self.ui.video_open.connect(self._on_video_open)
-        self.ui.camera_open.connect(self._on_camera_open)
+        self.ui.model_load.connect(self.handle_load_model)
+        self.ui.image_open.connect(self.handle_open_image)
+        self.ui.video_open.connect(self.handle_open_video)
+        self.ui.camera_open.connect(self.handle_open_camera)
         
         # ===== 控制按钮信号 =====
-        self.right_panel.start_inference.connect(self._on_start_inference)
-        self.right_panel.stop_inference.connect(self._on_stop_inference)
-        self.right_panel.save_screenshot.connect(self._on_save_screenshot)
+        self.right_panel.start_inference.connect(self.handle_start_inference)
+        self.right_panel.stop_inference.connect(self.handle_stop_inference)
+        self.right_panel.save_screenshot.connect(self.handle_save_screenshot)
         
         # ===== 左侧面板播放/暂停信号 =====
-        self.ui.left_panel_play_pause.connect(self._on_play_pause_clicked)
+        self.ui.left_panel_play_pause.connect(self.handle_play_pause)
         
         # ===== 左侧面板进度条信号 =====
-        self.left_panel.progress_changed.connect(self._on_progress_changed)
+        self.left_panel.progress_changed.connect(self.handle_progress_change)
+        
+        # ===== 参数信号 =====
+        self.right_panel.iou_changed.connect(self.handle_iou_change)
+        self.right_panel.confidence_changed.connect(self.handle_confidence_change)
+        self.right_panel.delay_changed.connect(self.handle_delay_change)
+        self.right_panel.line_width_changed.connect(self.handle_line_width_change)
     
     # ============================================================================
     # 信号处理方法
@@ -705,7 +707,7 @@ class YOLOMainController(QObject):
         except Exception as e:
             print(f"更新进度失败: {e}")
     
-    def _on_progress_changed(self, value):
+    def handle_progress_change(self, value):
         """用户拖动进度条"""
         if self.current_mode == 'video' and hasattr(self.video_player, 'cap') and self.video_player.cap:
             try:
@@ -718,7 +720,7 @@ class YOLOMainController(QObject):
             except Exception as e:
                 print(f"跳转进度失败: {e}")
     
-    def _on_play_pause_clicked(self):
+    def handle_play_pause(self):
         """播放/暂停按钮点击"""
         try:
             if self.current_mode == 'video':
@@ -845,7 +847,7 @@ class YOLOMainController(QObject):
     # 主要功能处理方法
     # ============================================================================
     
-    def _on_model_load(self):
+    def handle_load_model(self):
         """加载模型"""
         try:
             # 使用配置文件中的文件过滤器
@@ -1012,7 +1014,7 @@ class YOLOMainController(QObject):
         except Exception as e:
             self._show_error("选择模块失败", str(e))
     
-    def _on_image_open(self):
+    def handle_open_image(self):
         """打开图片"""
         try:
             self._stop_all()
@@ -1040,7 +1042,7 @@ class YOLOMainController(QObject):
         except Exception as e:
             self._show_error("打开图片失败", str(e))
     
-    def _on_video_open(self):
+    def handle_open_video(self):
         """打开视频"""
         try:
             self._stop_all()
@@ -1068,7 +1070,7 @@ class YOLOMainController(QObject):
         except Exception as e:
             self._show_error("打开视频失败", str(e))
 
-    def _on_camera_open(self):
+    def handle_open_camera(self):
         """打开摄像头"""
         try:
             self._stop_all()
@@ -1094,7 +1096,7 @@ class YOLOMainController(QObject):
     # 控制按钮处理方法
     # ============================================================================
     
-    def _on_start_inference(self):
+    def handle_start_inference(self):
         """开始推理"""
         try:
             # 检查必要条件
@@ -1270,11 +1272,11 @@ class YOLOMainController(QObject):
             self.model_loaded = False
             return False
     
-    def _on_stop_inference(self):
+    def handle_stop_inference(self):
         """停止推理"""
         self._stop_processing()
     
-    def _on_save_screenshot(self):
+    def handle_save_screenshot(self):
         """保存截图"""
         try:
             pixmap = self.left_panel.display_label.pixmap()
@@ -1346,3 +1348,52 @@ class YOLOMainController(QObject):
         )
         print(f"错误 [{title}]: {message}")
         traceback.print_exc()
+    
+    def handle_iou_change(self, value):
+        """处理IOU阈值变化"""
+        try:
+            self.default_params['iou_threshold'] = value
+            print(f"IOU阈值已更新: {value}")
+            # 如果模型已加载，更新模型参数
+            if hasattr(self, 'yolo_processor') and self.yolo_processor is not None:
+                success = self.yolo_processor.update_params(iou_threshold=value)
+                if success:
+                    print("IOU参数更新成功")
+                else:
+                    print("IOU参数更新失败")
+        except Exception as e:
+            self._show_error("更新IOU阈值失败", str(e))
+    
+    def handle_confidence_change(self, value):
+        """处理置信度阈值变化"""
+        try:
+            self.default_params['confidence_threshold'] = value
+            print(f"置信度阈值已更新: {value}")
+            # 如果模型已加载，更新模型参数
+            if hasattr(self, 'yolo_processor') and self.yolo_processor is not None:
+                success = self.yolo_processor.update_params(conf_threshold=value)
+                if success:
+                    print("置信度参数更新成功")
+                else:
+                    print("置信度参数更新失败")
+        except Exception as e:
+            self._show_error("更新置信度阈值失败", str(e))
+    
+    def handle_delay_change(self, value):
+        """处理延迟时间变化"""
+        try:
+            self.default_params['delay_ms'] = value
+            print(f"延迟时间已更新: {value}ms")
+        except Exception as e:
+            self._show_error("更新延迟时间失败", str(e))
+    
+    def handle_line_width_change(self, value):
+        """处理线宽变化"""
+        try:
+            self.default_params['line_width'] = value
+            print(f"线宽已更新: {value}")
+            # 如果模型已加载，更新模型参数
+            if self.yolo_processor:
+                self.yolo_processor.update_params(line_width=value)
+        except Exception as e:
+            self._show_error("更新线宽失败", str(e))

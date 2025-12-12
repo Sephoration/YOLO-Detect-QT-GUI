@@ -747,6 +747,42 @@ class UnifiedYOLO(baseDetect):
             print(f"❌ 模型预热失败: {e}")
             # 预热失败不影响模型使用，只是首次推理可能较慢
     
+    def update_params(self, conf_threshold=None, iou_threshold=None):
+        """实时更新推理参数
+        
+        Args:
+            conf_threshold: 新的置信度阈值（0.0-1.0）
+            iou_threshold: 新的IOU阈值（0.0-1.0）
+        
+        Returns:
+            bool: 参数更新是否成功
+        """
+        try:
+            if conf_threshold is not None:
+                # 验证置信度阈值范围
+                if 0.0 <= conf_threshold <= 1.0:
+                    self.conf = conf_threshold
+                    self.conf_threshold = conf_threshold  # 更新原始属性以便保持一致性
+                    print(f"[INFO] 置信度阈值更新为: {conf_threshold}")
+                else:
+                    print(f"[ERROR] 置信度阈值必须在0.0到1.0之间，提供的值: {conf_threshold}")
+                    return False
+            
+            if iou_threshold is not None:
+                # 验证IOU阈值范围
+                if 0.0 <= iou_threshold <= 1.0:
+                    self.iou = iou_threshold
+                    self.iou_threshold = iou_threshold  # 更新原始属性以便保持一致性
+                    print(f"[INFO] IOU阈值更新为: {iou_threshold}")
+                else:
+                    print(f"[ERROR] IOU阈值必须在0.0到1.0之间，提供的值: {iou_threshold}")
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"[ERROR] 更新参数时出错: {e}")
+            return False
+    
     def __call__(self, frame: np.ndarray) -> Dict[str, Any]:
         """使对象可调用"""
         return self.process_frame(frame)
