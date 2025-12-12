@@ -1,13 +1,62 @@
 """
 软件界面_ui部分
+保留单独运行能力、以方便测试
 """
 
 import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QSlider, QPushButton, QGroupBox, 
-                               QToolBar, QSizePolicy, QMenu, QScrollArea)
+                               QToolBar, QSizePolicy, QMenu, QScrollArea, QErrorMessage)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
+from collections import OrderedDict
+
+
+# ============================================================================
+# 常量定义类 - 集中管理所有UI相关常量
+# ============================================================================
+class UIContants:
+    # 尺寸常量
+    MIN_DISPLAY_WIDTH = 320       # 显示标签最小宽度
+    MIN_DISPLAY_HEIGHT = 180      # 显示标签最小高度
+    CONTROL_HEIGHT = 40           # 视频控制部件高度
+    PLAY_BUTTON_SIZE = 32         # 播放/暂停按钮尺寸
+    FILE_LABEL_HEIGHT = 25        # 文件名标签高度
+    TIME_LABEL_MIN_WIDTH = 85     # 时间标签最小宽度
+    RIGHT_PANEL_MIN_WIDTH = 220   # 右侧面板最小宽度
+    BUTTON_MIN_HEIGHT = 35        # 按钮最小高度
+    
+    # 布局常量
+    PADDING_SMALL = 10            # 小间距/内边距
+    PADDING_MEDIUM = 12           # 中等间距/内边距
+    LAYOUT_SPACING = 10           # 布局间距
+    FILE_LABEL_MAX_WIDTH = 300    # 文件名标签最大宽度
+    FILE_LABEL_WIDTH_OFFSET = 20  # 文件名标签宽度偏移
+    
+    # 进度条常量
+    PROGRESS_RANGE = 1000         # 进度条范围
+    
+    # 字体常量
+    TIME_FONT_SIZE = 9            # 时间显示字体大小
+    
+    # 滑块常量
+    SLIDER_LABEL_WIDTH = 60       # 滑块标签宽度
+    SLIDER_WIDTH = 80             # 滑块宽度
+    SLIDER_VALUE_LABEL_WIDTH = 35 # 滑块值标签宽度
+    
+    # 窗口常量
+    MIN_WINDOW_WIDTH = 1000       # 窗口最小宽度
+    MIN_WINDOW_HEIGHT = 650       # 窗口最小高度
+    INITIAL_WINDOW_WIDTH = 1140   # 初始窗口宽度
+    INITIAL_WINDOW_HEIGHT = 675   # 初始窗口高度
+    
+    # 缓存常量
+    MAX_PIXMAP_CACHE_SIZE = 100   # QPixmap缓存池最大帧数
+    PIXMAP_CACHE_SIZE = 100       # QPixmap缓存池大小（最大帧数）
+    
+    # 位置常量
+    FILE_LABEL_X = 10             # 文件名标签X坐标
+    FILE_LABEL_Y = 10             # 文件名标签Y坐标
 
 
 # ============================================================================
@@ -15,12 +64,61 @@ from PySide6.QtGui import QAction, QFont
 # 功能：确保图像显示区域始终保持16:9比例，随父容器宽度自适应调整
 # ============================================================================
 class AspectRatioDisplayLabel(QLabel):
-    """保持16:9显示比例的居中图像标签"""
+    """保持16:9显示比例的居中图像标签，带QPixmap LRU缓存池"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAlignment(Qt.AlignCenter)
-        self.setMinimumSize(320, 180)  # 最小16:9尺寸(320x180)
+        self.setMinimumSize(UIContants.MIN_DISPLAY_WIDTH, UIContants.MIN_DISPLAY_HEIGHT)  # 最小16:9尺寸
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # 初始化QPixmap LRU缓存池
+        self._pixmap_cache = OrderedDict()
+        
+    def setPixmap(self, pixmap, frame_id=None):
+        """重写setPixmap方法以保持图像比例并使用LRU缓存
+        
+        Args:
+            pixmap: QPixmap对象
+            frame_id: 可选的帧ID，用于缓存管理
+        """
+        if not pixmap.isNull():
+            # 如果提供了frame_id，使用缓存机制
+            if frame_id is not None:
+                # 检查缓存中是否已存在
+                if frame_id in self._pixmap_cache:
+                    # 更新访问顺序（LRU）
+                    scaled_pixmap = self._pixmap_cache.pop(frame_id)
+                    self._pixmap_cache[frame_id] = scaled_pixmap
+                    super().setPixmap(scaled_pixmap)
+                    return
+                
+                # 计算缩放比例以适应标签大小
+                scaled_pixmap = self._scale_pixmap_to_fit(pixmap)
+                
+                # 添加到缓存并管理缓存大小
+                self._pixmap_cache[frame_id] = scaled_pixmap
+                if len(self._pixmap_cache) > UIContants.PIXMAP_CACHE_SIZE:
+                    # 移除最不常用的项（OrderedDict的第一个项）
+                    self._pixmap_cache.popitem(last=False)
+                
+                super().setPixmap(scaled_pixmap)
+            else:
+                # 没有frame_id时直接处理
+                scaled_pixmap = self._scale_pixmap_to_fit(pixmap)
+                super().setPixmap(scaled_pixmap)
+        else:
+            super().setPixmap(pixmap)
+    
+    def _scale_pixmap_to_fit(self, pixmap):
+        """缩放pixmap以适应标签大小，保持宽高比"""
+        return pixmap.scaled(
+            self.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+    
+    def clear_cache(self):
+        """清空QPixmap缓存池"""
+        self._pixmap_cache.clear()
         
     def resizeEvent(self, event):
         """重写resize事件，保持16:9比例"""
@@ -68,7 +166,7 @@ class LeftDisplayPanel(QWidget):
     """左侧展示面板：4:3容器，文件名直接印在黑边上，16:9区域贴边"""
     
     # 定义信号
-    progress_changed = Signal(int)  # 进度条值改变信号
+    progress_changed = Signal(float)  # 进度条值改变信号（改为浮点数）
     play_pause_clicked = Signal()   # 播放/暂停按钮点击信号
     
     def __init__(self):
@@ -93,7 +191,7 @@ class LeftDisplayPanel(QWidget):
         # 容器布局 - 使用弹性空间让内容居中
         container_layout = QVBoxLayout(self.display_container)
         # 左右内边距设为12，以保持左右间距（居中视觉效果）
-        container_layout.setContentsMargins(12, 0, 12, 0)
+        container_layout.setContentsMargins(UIContants.PADDING_MEDIUM, 0, UIContants.PADDING_MEDIUM, 0)
         container_layout.setSpacing(0)
         
         # 添加上方弹性空间
@@ -124,42 +222,43 @@ class LeftDisplayPanel(QWidget):
         """创建文件名标签（叠加在黑色背景上）"""
         self.filename_label = QLabel(self.display_container)
         self.filename_label.setObjectName("FilenameLabel")
-        self.filename_label.setFixedHeight(25)
+        self.filename_label.setFixedHeight(UIContants.FILE_LABEL_HEIGHT)
         self.filename_label.hide()  # 默认隐藏
     
     def _create_video_control_widget(self):
         """创建视频控制部件（播放/暂停按钮、进度条、时间显示）"""
         control_widget = QWidget()
-        control_widget.setFixedHeight(40)
+        control_widget.setFixedHeight(UIContants.CONTROL_HEIGHT)
         
         # 视频控制布局
         control_layout = QHBoxLayout(control_widget)
-        control_layout.setContentsMargins(12, 0, 12, 0)  # 左右留边距
-        control_layout.setSpacing(10)
+        control_layout.setContentsMargins(UIContants.PADDING_MEDIUM, 0, UIContants.PADDING_MEDIUM, 0)  # 左右留边距
+        control_layout.setSpacing(UIContants.LAYOUT_SPACING)
         
         # 播放/暂停按钮
         self.play_pause_button = QPushButton("▶")
         self.play_pause_button.setObjectName("PlayPauseButton")
-        self.play_pause_button.setFixedSize(32, 32)
+        self.play_pause_button.setFixedSize(UIContants.PLAY_BUTTON_SIZE, UIContants.PLAY_BUTTON_SIZE)
         self.play_pause_button.clicked.connect(self._on_play_pause_clicked)
         
         # 进度条
         self.progress_slider = QSlider(Qt.Horizontal)
         self.progress_slider.setObjectName("ProgressSlider")
-        self.progress_slider.setRange(0, 1000)
+        self.progress_slider.setRange(0, UIContants.PROGRESS_RANGE)
         self.progress_slider.setValue(0)
+        self.progress_slider.setToolTip("进度: 0%")  # 设置初始tooltip
         self.progress_slider.valueChanged.connect(
-            lambda v: self.progress_changed.emit(v)
+            lambda v: self.progress_changed.emit(v / UIContants.PROGRESS_RANGE)  # 转换为0-1浮点数
         )
         
         # 时间显示标签
         self.time_label = QLabel("--:-- / --:--")
         self.time_label.setObjectName("TimeLabel")
-        self.time_label.setMinimumWidth(85)
+        self.time_label.setMinimumWidth(UIContants.TIME_LABEL_MIN_WIDTH)
         self.time_label.setAlignment(Qt.AlignCenter)
         
         # 设置时间显示字体
-        font = QFont("Consolas", 9)
+        font = QFont("Consolas", UIContants.TIME_FONT_SIZE)
         self.time_label.setFont(font)
         
         # 添加到布局
@@ -192,19 +291,19 @@ class LeftDisplayPanel(QWidget):
     def _setup_style(self):
         """设置样式表"""
         self.setStyleSheet("""
-            QWidget {
+            QWidget {{
                 background-color: #f5f5f5;
-            }
-            QWidget#DisplayContainer {
+            }}
+            QWidget#DisplayContainer {{
                 background-color: #2a2a2a;  /* 黑色显示区域背景 */
-            }
-            QLabel#DisplayLabel {
+            }}
+            QLabel#DisplayLabel {{
                 background-color: #2a2a2a;
                 border: none;
                 color: white;
                 font-size: 12px;
-            }
-            QLabel#FilenameLabel {
+            }}
+            QLabel#FilenameLabel {{
                 background-color: transparent;
                 color: white;
                 padding: 0;
@@ -214,14 +313,14 @@ class LeftDisplayPanel(QWidget):
                 font-size: 11px;
                 font-weight: bold;
                 text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-            }
-            QWidget#VideoControlWidget {
+            }}
+            QWidget#VideoControlWidget {{
                 background-color: rgba(0, 0, 0, 0.85);  /* 半透明黑色控制栏 */
                 border-radius: 0;
                 border-top: 1px solid rgba(255, 255, 255, 0.15);
                 border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-            }
-            QPushButton#PlayPauseButton {
+            }}
+            QPushButton#PlayPauseButton {{
                 background-color: rgba(0, 120, 215, 0.9);
                 color: white;
                 border: none;
@@ -229,42 +328,42 @@ class LeftDisplayPanel(QWidget):
                 font-size: 14px;
                 font-weight: bold;
                 padding: 0;
-            }
-            QPushButton#PlayPauseButton:hover {
+            }}
+            QPushButton#PlayPauseButton:hover {{
                 background-color: rgba(0, 120, 215, 1.0);
-            }
-            QPushButton#PlayPauseButton:pressed {
+            }}
+            QPushButton#PlayPauseButton:pressed {{
                 background-color: rgba(0, 90, 158, 0.9);
-            }
-            QPushButton#PlayPauseButton:disabled {
+            }}
+            QPushButton#PlayPauseButton:disabled {{
                 background-color: rgba(80, 80, 80, 0.5);
                 color: rgba(180, 180, 180, 0.8);
-            }
+            }}
             
             /* 进度条样式 */
-            QSlider#ProgressSlider::groove:horizontal {
-                height: 6px;
+            QSlider#ProgressSlider::groove:horizontal {{
+                height: {0}px;
                 background: qlineargradient(
                     x1:0, y1:0, x2:1, y2:0,
                     stop:0 #444444, 
                     stop:1 #666666
                 );
-                border-radius: 3px;
-            }
-            QSlider#ProgressSlider::handle:horizontal {
+                border-radius: {1}px;
+            }}
+            QSlider#ProgressSlider::handle:horizontal {{
                 background: qradialgradient(
                     cx:0.5, cy:0.5, radius:0.5,
                     fx:0.5, fy:0.5,
                     stop:0.6 #0078d7,
                     stop:1.0 #005a9e
                 );
-                width: 16px;
-                height: 16px;
+                width: {2}px;
+                height: {3}px;
                 margin: -5px 0;
-                border-radius: 8px;
+                border-radius: {4}px;
                 border: 2px solid #ffffff;
-            }
-            QSlider#ProgressSlider::handle:horizontal:hover {
+            }}
+            QSlider#ProgressSlider::handle:horizontal:hover {{
                 background: qradialgradient(
                     cx:0.5, cy:0.5, radius:0.5,
                     fx:0.5, fy:0.5,
@@ -275,40 +374,58 @@ class LeftDisplayPanel(QWidget):
                 height: 18px;
                 margin: -6px 0;
                 border-radius: 9px;
-            }
-            QSlider#ProgressSlider::handle:horizontal:pressed {
+            }}
+            QSlider#ProgressSlider::handle:horizontal:pressed {{
                 background: qradialgradient(
                     cx:0.5, cy:0.5, radius:0.5,
                     fx:0.5, fy:0.5,
                     stop:0.6 #005a9e,
                     stop:1.0 #003b6a
                 );
-            }
-            QSlider#ProgressSlider:disabled::groove:horizontal {
+            }}
+            QSlider#ProgressSlider:disabled::groove:horizontal {{
                 background: #333333;
-            }
-            QSlider#ProgressSlider:disabled::handle:horizontal {
+            }}
+            QSlider#ProgressSlider:disabled::handle:horizontal {{
                 background: #555555;
                 border: 2px solid #777777;
-            }
+            }}
             
             /* 时间显示样式 */
-            QLabel#TimeLabel {
+            QLabel#TimeLabel {{
                 color: white;
                 background-color: rgba(0, 0, 0, 0.7);
                 font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: bold;
                 padding: 4px 10px;
                 border-radius: 4px;
                 border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-            QLabel#TimeLabel:disabled {
+            }}
+            QLabel#TimeLabel:disabled {{
                 color: #aaaaaa;
                 background-color: rgba(40, 40, 40, 0.7);
                 border: 1px solid rgba(100, 100, 100, 0.2);
-            }
-        """)
+            }}
+            /* 文件名标签样式 */
+            QLabel#FilenameLabel {{
+                background-color: transparent;
+                color: white;
+                padding: 0;
+                border: none;
+                border-radius: 0;
+                font-family: 'Microsoft YaHei';
+                font-size: 11px;
+                font-weight: bold;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            }}
+        """.format(
+            6,  # 进度条槽高度
+            3,  # 进度条槽圆角
+            16, # 进度条手柄宽度
+            16, # 进度条手柄高度
+            8   # 进度条手柄圆角
+        ))
     
     # ===== 公共接口方法 =====
     
@@ -344,16 +461,16 @@ class LeftDisplayPanel(QWidget):
             self.filename_label.move(10, 10)
             self.filename_label.setFixedWidth(min(300, self.display_container.width() - 20))
     
-    def set_display_image(self, pixmap):
-        """设置显示图像（保持原比例）"""
+    def set_display_image(self, pixmap, frame_id=None):
+        """设置显示图像（保持原比例）
+        
+        Args:
+            pixmap: QPixmap对象
+            frame_id: 可选的帧ID，用于缓存管理
+        """
         if pixmap:
-            # 缩放图像：保持比例，平滑转换
-            scaled_pixmap = pixmap.scaled(
-                self.display_label.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.display_label.setPixmap(scaled_pixmap)
+            # 使用带缓存的setPixmap方法
+            self.display_label.setPixmap(pixmap, frame_id)
         else:
             self.display_label.clear()
     
@@ -382,6 +499,9 @@ class LeftDisplayPanel(QWidget):
         """设置进度条当前值"""
         if 0 <= value <= self.progress_slider.maximum():
             self.progress_slider.setValue(value)
+            # 更新tooltip显示百分比
+            percentage = int((value / self.progress_slider.maximum()) * 100)
+            self.progress_slider.setToolTip(f"进度: {percentage}%")
     
     def set_time_display(self, current_time, total_time):
         """设置时间显示文本"""
@@ -419,7 +539,7 @@ class RightControlPanel(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.setMinimumWidth(220)
+        self.setMinimumWidth(UIContants.RIGHT_PANEL_MIN_WIDTH)
         self._init_ui()    # 初始化UI
         self._setup_style()  # 设置样式
     
@@ -435,8 +555,8 @@ class RightControlPanel(QWidget):
         # 滚动区域内容组件
         content_widget = QWidget()
         self._content_layout = QVBoxLayout(content_widget)
-        self._content_layout.setContentsMargins(10, 10, 10, 10)
-        self._content_layout.setSpacing(10)
+        self._content_layout.setContentsMargins(UIContants.PADDING_SMALL, UIContants.PADDING_SMALL, UIContants.PADDING_SMALL, UIContants.PADDING_SMALL)
+        self._content_layout.setSpacing(UIContants.LAYOUT_SPACING)
         
         # 添加各组组件
         self.model_info_group = self._create_model_info_group()
@@ -550,20 +670,20 @@ class RightControlPanel(QWidget):
         
         # 标签
         label = QLabel(label_text)
-        label.setMinimumWidth(60)
-        label.setMaximumWidth(60)
+        label.setMinimumWidth(UIContants.SLIDER_LABEL_WIDTH)
+        label.setMaximumWidth(UIContants.SLIDER_LABEL_WIDTH)
         layout.addWidget(label)
         
         # 滑块
         slider = QSlider(Qt.Horizontal)
         slider.setRange(min_val * scale_factor, max_val * scale_factor)
         slider.setValue(default_val * scale_factor)
-        slider.setMinimumWidth(80)
+        slider.setMinimumWidth(UIContants.SLIDER_WIDTH)
         
         # 值显示标签
         value_label = QLabel(str(default_val))
-        value_label.setMinimumWidth(35)
-        value_label.setMaximumWidth(35)
+        value_label.setMinimumWidth(UIContants.SLIDER_VALUE_LABEL_WIDTH)
+        value_label.setMaximumWidth(UIContants.SLIDER_VALUE_LABEL_WIDTH)
         value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         # 连接信号
@@ -631,11 +751,11 @@ class RightControlPanel(QWidget):
         layout.setSpacing(8)
         
         self.start_button = QPushButton("开始")
-        self.start_button.setMinimumHeight(35)
+        self.start_button.setMinimumHeight(UIContants.BUTTON_MIN_HEIGHT)
         self.start_button.clicked.connect(self.start_inference.emit)
         
         self.stop_button = QPushButton("停止")
-        self.stop_button.setMinimumHeight(35)
+        self.stop_button.setMinimumHeight(UIContants.BUTTON_MIN_HEIGHT)
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.stop_inference.emit)
         
@@ -647,7 +767,7 @@ class RightControlPanel(QWidget):
     def _create_save_button(self):
         """创建保存截图按钮"""
         button = QPushButton("保存截图")
-        button.setMinimumHeight(35)
+        button.setMinimumHeight(UIContants.BUTTON_MIN_HEIGHT)
         button.clicked.connect(self.save_screenshot.emit)
         return button
     
@@ -849,7 +969,7 @@ class YOLOMainWindowUI(QMainWindow):
         toolbar.addAction(self.btn_file)
         
         self.btn_model = QAction("打开模型", self)
-        self.btn_model.triggered.connect(self.model_load.emit)
+        self.btn_model.triggered.connect(self.load_model)
         toolbar.addAction(self.btn_model)
         
         self.btn_image = QAction("打开图片", self)
@@ -857,7 +977,7 @@ class YOLOMainWindowUI(QMainWindow):
         toolbar.addAction(self.btn_image)
         
         self.btn_video = QAction("打开视频", self)
-        self.btn_video.triggered.connect(self.video_open.emit)
+        self.btn_video.triggered.connect(self.load_video)
         toolbar.addAction(self.btn_video)
         
         self.btn_camera = QAction("打开摄像头", self)
@@ -872,6 +992,39 @@ class YOLOMainWindowUI(QMainWindow):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         toolbar.addWidget(spacer)
+    
+    def load_model(self, model_path=None):
+        """加载模型"""
+        try:
+            # 直接触发外部信号，让控制器处理
+            self.model_load.emit()  # ✅ 调用已定义的信号
+        except Exception as e:
+            # 统一弹出错误消息
+            error_dialog = QErrorMessage(self)
+            error_dialog.setWindowTitle("模型加载失败")
+            error_dialog.showMessage(f"加载模型时发生错误: {str(e)}")
+    
+    def load_video(self, video_path=None):
+        """加载视频"""
+        try:
+            # 直接触发外部信号，让控制器处理
+            self.video_open.emit()  # ✅ 调用已定义的信号
+        except Exception as e:
+            # 统一弹出错误消息
+            error_dialog = QErrorMessage(self)
+            error_dialog.setWindowTitle("视频加载失败")
+            error_dialog.showMessage(f"打开视频时发生错误: {str(e)}")
+    
+    def stop_inference(self):
+        """停止推理"""
+        try:
+            # 触发信号，让控制器处理实际的停止逻辑
+            self._on_stop_inference()
+        except Exception as e:
+            # 统一弹出错误消息
+            error_dialog = QErrorMessage(self)
+            error_dialog.setWindowTitle("停止推理失败")
+            error_dialog.showMessage(f"停止推理线程时发生错误: {str(e)}")
     
     def _show_file_menu(self):
         """显示文件下拉菜单"""
@@ -939,48 +1092,51 @@ class YOLOMainWindowUI(QMainWindow):
     
     def _on_play_pause_clicked(self):
         """播放/暂停按钮点击处理"""
-        # 触发外部信号，让控制器处理实际逻辑
-        self.left_panel_play_pause.emit()
+        self._forward_signal('left_panel_play_pause')
     
     def _on_progress_changed(self, value):
         """进度条值改变处理"""
-        # 此方法可由控制器重写或直接使用进度值
-        pass
+        self._forward_signal('progress_changed', value)
     
     def _on_start_inference(self):
         """开始推理处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('start_inference')
     
     def _on_stop_inference(self):
         """停止推理处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('stop_inference')
     
     def _on_save_screenshot(self):
         """保存截图处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('save_screenshot')
     
     def _on_iou_changed(self, value):
         """IOU阈值改变处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('iou_changed', value)
     
     def _on_confidence_changed(self, value):
         """置信度阈值改变处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('confidence_changed', value)
     
     def _on_delay_changed(self, value):
         """延迟时间改变处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('delay_changed', value)
     
     def _on_line_width_changed(self, value):
         """线宽改变处理"""
-        # 此方法可由控制器重写
-        pass
+        self._forward_signal('line_width_changed', value)
+    
+    # 信号转发方法 - 简化为统一的_forward_signal方法
+    def _forward_signal(self, signal_name, *args):
+        """通用信号转发方法
+        
+        Args:
+            signal_name: 信号名称
+            *args: 信号参数
+        """
+        signal = getattr(self, signal_name, None)
+        if signal and isinstance(signal, Signal):
+            signal.emit(*args)
     
     # ===== 公共接口方法 =====
     
