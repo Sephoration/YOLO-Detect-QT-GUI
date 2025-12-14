@@ -874,7 +874,7 @@ class YOLOMainController(QObject):
                     model_info = UnifiedYOLO.analyze_model_info(model_path)
                     
                     if model_info:
-                        # 获取模型信息
+                        # 获取模型信息 - 使用相对路径显示
                         model_name = os.path.basename(model_path)
                         task_type = model_info.get('task_type', 'detection')
                         input_size = model_info.get('input_size', '640x640')
@@ -901,7 +901,7 @@ class YOLOMainController(QObject):
                         QMessageBox.information(
                             self.ui, "模型分析成功",
                             f"✅ 已自动识别模型类型\n\n"
-                            f"📦 模型名称: {model_name}\n"
+                            f"📦 模型: {model_name}\n"
                             f"🎯 任务类型: {display_name}\n"
                             f"📏 输入尺寸: {input_size}\n"
                             f"🔢 类别数量: {class_count}\n\n"
@@ -1001,7 +1001,7 @@ class YOLOMainController(QObject):
             # 显示成功信息
             QMessageBox.information(
                 self.ui, "模型选择成功",
-                f"✅ 已选择{display_name}模式\n\n"
+                f"✅ 已选择{display_name}模式\n\n" 
                 f"📦 模型: {os.path.basename(model_path)}\n"
                 f"🎯 任务: {display_name}\n\n"
                 f"模型将在点击'开始'时正式加载。"
@@ -1229,7 +1229,7 @@ class YOLOMainController(QObject):
             # 获取参数
             params = self.right_panel.get_parameters()
             
-            print(f"正在正式加载YOLO模型: {self.model_path}")
+            print(f"正在正式加载YOLO模型: {os.path.basename(self.model_path)}")
             print(f"模式: {self.model_mode}")
             print(f"参数: IOU={params['iou_threshold']}, 置信度={params['confidence_threshold']}")
             
@@ -1263,7 +1263,7 @@ class YOLOMainController(QObject):
                 class_count=str(class_count)
             )
             
-            print(f"✅ YOLO处理器加载成功: {self.model_mode}")
+            print(f"✅ YOLO处理器加载成功: {self.model_mode} - {os.path.basename(self.model_path)}")
             print(f"   - 输入尺寸: {input_size_str}")
             print(f"   - 类别数量: {class_count}")
             return True

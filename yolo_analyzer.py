@@ -115,7 +115,9 @@ class UnifiedYOLO(baseDetect):
             return True
         
         try:
-            print(f"正在加载模型: {self.model_path}")
+            # 确保使用相对路径显示
+            model_name = Path(self.model_path).name
+            print(f"正在加载模型: {model_name}")
             
             # ✅ 老师的方式：直接创建YOLO对象，不使用.predict()
             self.model = YOLO(self.model_path)
@@ -124,7 +126,7 @@ class UnifiedYOLO(baseDetect):
             # 收集模型信息
             self._collect_model_info()
             
-            print(f"✅ 模型加载成功: {Path(self.model_path).name}")
+            print(f"✅ 模型加载成功: {model_name}")
             
             # 执行预热（如果启用）
             if self.warmup and not self.warmed_up:
@@ -420,11 +422,12 @@ class UnifiedYOLO(baseDetect):
             img_pil = Image.fromarray(frame_rgb)
             draw = ImageDraw.Draw(img_pil)
             
-            # 加载字体
+            # 加载字体 - 使用相对路径
             font_path = "SimHei.ttf"
             if os.path.exists(font_path):
                 font = ImageFont.truetype(font_path, 20)
             else:
+                print(f"警告: 未找到字体文件 {font_path}，使用默认字体")
                 font = ImageFont.load_default()
             
             # 绘制文本
