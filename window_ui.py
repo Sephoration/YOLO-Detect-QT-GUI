@@ -10,9 +10,12 @@
 """
 
 import sys
+import os
+from datetime import datetime  # 从datetime模块导入datetime类
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QSlider, QPushButton, QGroupBox, 
-                               QToolBar, QSizePolicy, QMenu, QScrollArea)
+                               QToolBar, QSizePolicy, QMenu, QScrollArea,
+                               QMessageBox, QTextBrowser, QDialog)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
 from collections import OrderedDict
@@ -164,10 +167,6 @@ class AspectRatioDisplayLabel(QLabel):
         self.setFixedSize(ideal_width, ideal_height)
 
 
-# ============================================================================
-# 左侧展示区域组件
-# 功能：负责图像/视频/摄像头内容展示，包含播放控制和文件名显示
-# ============================================================================
 # ============================================================================
 # 左侧展示区域组件
 # 功能：负责图像/视频/摄像头内容展示，包含播放控制和文件名显示
@@ -990,11 +989,22 @@ class YOLOMainWindowUI(QMainWindow):
     def _show_file_menu(self):
         """显示文件下拉菜单"""
         file_menu = QMenu(self)
-        file_menu.addAction("初始化", self.file_menu_init.emit)
+        
+        # "初始化"菜单项 - 使用UI的确认对话框
+        init_action = QAction("初始化", self)
+        init_action.triggered.connect(self._on_file_init_clicked)
+        file_menu.addAction(init_action)
+        
+        # "另存为"和"保存"菜单项（暂时保留原有信号）
         file_menu.addAction("另存为", self.file_menu_save_as.emit)
         file_menu.addAction("保存", self.file_menu_save.emit)
+        
         file_menu.addSeparator()
-        file_menu.addAction("退出", self.file_menu_exit.emit)
+        
+        # "退出"菜单项 - 使用UI的确认对话框
+        exit_action = QAction("退出", self)
+        exit_action.triggered.connect(self._on_file_exit_clicked)
+        file_menu.addAction(exit_action)
         
         # 查找"文件"按钮位置并显示菜单
         for action in self.findChildren(QAction):
@@ -1010,32 +1020,182 @@ class YOLOMainWindowUI(QMainWindow):
                                 file_menu.exec_(pos)
                                 return
         
-        #  fallback: 在窗口左上角显示
+        # fallback: 在窗口左上角显示
         file_menu.exec_(self.mapToGlobal(self.rect().topLeft()))
     
     def _show_help_menu(self):
-        """显示ctober下拉菜单"""
-        help_menu = QMenu(self)
-        help_menu.addAction("关于", self.help_menu_about.emit)
-        help_menu.addAction("使用说明", self.help_menu_manual.emit)
+        """显示帮助菜单"""
+        help_menu = QMenu("帮助", self)
         
-        # 查找"帮助"按钮位置并显示菜单
-        for action in self.findChildren(QAction):
-            if action.text() == "帮助":
-                toolbar = self.findChild(QToolBar)
-                if toolbar:
-                    for act in toolbar.actions():
-                        if act.text() == "帮助":
-                            tool_btn = toolbar.widgetForAction(act)
-                            if tool_btn:
-                                # 在按钮下方显示菜单
-                                pos = tool_btn.mapToGlobal(tool_btn.rect().bottomLeft())
-                                help_menu.exec_(pos)
-                                return
+        # "关于"菜单项 - 直接使用UI方法
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self._on_help_about_clicked)
+        help_menu.addAction(about_action)
         
-        # fallback: 在窗口左上角显示
+        # "使用说明"菜单项 - 直接使用UI方法
+        manual_action = QAction("使用说明", self)
+        manual_action.triggered.connect(self._on_help_manual_clicked)
+        help_menu.addAction(manual_action)
+        
+        # 查找"帮助"按钮位置并在按钮下方显示菜单
+        toolbar = self.findChild(QToolBar)
+        if toolbar:
+            for act in toolbar.actions():
+                if act.text() == "帮助":
+                    tool_btn = toolbar.widgetForAction(act)
+                    if tool_btn:
+                        # 在按钮下方显示菜单
+                        pos = tool_btn.mapToGlobal(tool_btn.rect().bottomLeft())
+                        help_menu.exec_(pos)
+                        return
+        
+        # 如果找不到按钮，使用原始的fallback逻辑
         help_menu.exec_(self.mapToGlobal(self.rect().topLeft()))
     
+    def _on_file_init_clicked(self):
+        """文件菜单中的初始化点击处理"""
+        # 显示确认对话框
+        if self.show_init_dialog():
+            # 发送信号给控制器执行初始化逻辑
+            self.file_menu_init.emit()
+            # UI自己可以在这里执行一些UI相关的初始化（如果需要）
+            # 控制器会处理完成后调用show_init_complete_dialog()
+    
+    def _on_file_exit_clicked(self):
+        """文件菜单中的退出点击处理"""
+        # 显示确认对话框
+        if self.show_confirm_exit_dialog():
+            # 发送信号给控制器执行退出逻辑
+            self.file_menu_exit.emit()
+    
+    def _on_help_about_clicked(self):
+        """帮助菜单中的关于点击处理"""
+        # 直接显示关于对话框（UI独立功能）
+        self.show_about_dialog()
+        # 同时发射信号给控制器（可选）
+        self.help_menu_about.emit()
+    
+    def _on_help_manual_clicked(self):
+        """帮助菜单中的使用说明点击处理"""
+        # 直接显示使用说明对话框（UI独立功能）
+        self.show_help_manual_dialog()
+        # 同时发射信号给控制器（可选）
+        self.help_menu_manual.emit()
+
+    # ===== UI对话框方法（所有弹窗都在UI中处理） =====
+    
+    def show_init_dialog(self) -> bool:
+        """显示初始化确认对话框
+        
+        Returns:
+            bool: 用户是否确认初始化
+        """
+        result = QMessageBox.question(
+            self,
+            "确认初始化",
+            "是否要初始化所有设置？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        return result == QMessageBox.Yes
+    
+    def show_init_complete_dialog(self):
+        """显示初始化完成对话框"""
+        QMessageBox.information(
+            self,
+            "初始化完成",
+            "所有设置已重置"
+        )
+    
+    def show_confirm_exit_dialog(self) -> bool:
+        """显示退出确认对话框
+        
+        Returns:
+            bool: 用户是否确认退出
+        """
+        result = QMessageBox.question(
+            self,
+            "确认退出",
+            "确定要退出程序吗？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        return result == QMessageBox.Yes
+    
+    def show_about_dialog(self):
+        """显示关于对话框
+        
+        此方法可以独立运行，也可以通过控制器信号触发。
+        显示应用程序的基本信息，包括名称、版本、开发者和版权信息。
+        """
+        QMessageBox.about(
+            self,
+            "关于 YOLO_Viewer",
+            f"""<h3>YOLO_Viewer</h3>
+            <p>强大的YOLO目标检测可视化工具</p>
+            <p><b>版本:</b> 1.0.0</p>
+            <p><b>开发者:</b> YOLO Team</p>
+            <p><b>版权所有:</b> © {datetime.now().year}</p>
+            <p>支持多种YOLO模型的实时推理和可视化</p>"""
+        )
+        
+    def show_help_manual_dialog(self):
+        """显示使用说明对话框
+        
+        此方法可以独立运行，也可以通过控制器信号触发。
+        显示应用程序的使用指南和帮助信息。
+        """
+        # 创建自定义对话框
+        dialog = QDialog(self)
+        dialog.setWindowTitle("使用说明")
+        dialog.resize(600, 500)
+        
+        # 创建文本浏览器显示说明内容
+        text_browser = QTextBrowser()
+        text_browser.setHtml("""
+        <h3>YOLO_Viewer 使用指南</h3>
+        
+        <h4>基本功能</h4>
+        <ul>
+            <li><b>加载模型:</b> 点击工具栏中的模型图标，选择YOLO模型文件</li>
+            <li><b>打开图像:</b> 点击工具栏中的图像图标，选择要分析的图像</li>
+            <li><b>打开视频:</b> 点击工具栏中的视频图标，选择要分析的视频</li>
+            <li><b>打开摄像头:</b> 点击工具栏中的摄像头图标，启动实时摄像头分析</li>
+        </ul>
+        
+        <h4>推理控制</h4>
+        <ul>
+            <li><b>开始推理:</b> 加载模型和媒体文件后，点击"开始"按钮</li>
+            <li><b>停止推理:</b> 点击"停止"按钮暂停分析</li>
+            <li><b>调整参数:</b> 使用右侧面板调整置信度、IOU阈值等参数</li>
+        </ul>
+        
+        <h4>其他功能</h4>
+        <ul>
+            <li><b>保存截图:</b> 点击工具栏中的保存图标，保存当前显示的图像</li>
+            <li><b>检测设置:</b> 点击"检测设置"按钮，调整检测相关参数</li>
+        </ul>
+        
+        <p>如有任何问题或建议，请联系开发者团队。</p>
+        """)
+        
+        # 设置布局
+        layout = QVBoxLayout()
+        layout.addWidget(text_browser)
+        dialog.setLayout(layout)
+        
+        # 显示对话框
+        dialog.exec_()
+    
+    def show_detect_settings_dialog(self):
+        """显示检测设置对话框"""
+        # 这里只是一个简单的实现，后续可以根据需要扩展
+        QMessageBox.information(
+            self,
+            "检测设置",
+            "检测设置功能正在开发中..."
+        )
+
     # ===== 公共接口方法 =====
     
     def get_left_panel(self) -> LeftDisplayPanel:
@@ -1050,15 +1210,10 @@ class YOLOMainWindowUI(QMainWindow):
         """更新显示图像"""
         self.left_panel.set_display_image(pixmap)
     
-    def update_progress(self, value, max_value=None):
-        """更新进度条"""
-        if max_value is not None:
-            self.left_panel.set_progress_range(0, max_value)
-        self.left_panel.set_progress_value(value)
-    
     def update_time_display(self, current_time, total_time):
         """更新时间显示"""
-        self.left_panel.set_time_display(current_time, total_time)
+        # 原方法，现在可能不需要了
+        pass
     
     def set_play_state(self, is_playing):
         """设置播放状态"""
@@ -1095,59 +1250,6 @@ class YOLOMainWindowUI(QMainWindow):
     def set_controls_enabled(self, enabled):
         """启用/禁用控制面板"""
         self.left_panel.set_controls_enabled(enabled)
-    
-    def show_confirm_exit_dialog(self) -> bool:
-        """显示退出确认对话框
-        
-        Returns:
-            bool: 用户是否确认退出
-        """
-        from PySide6.QtWidgets import QMessageBox
-        result = QMessageBox.question(
-            self,
-            "确认退出",
-            "确定要退出程序吗？",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-        return result == QMessageBox.Yes
-    
-    def show_about_dialog(self):
-        """显示关于对话框"""
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.about(
-            self,
-            "关于",
-            "YOLO多功能检测系统\n"  
-            "版本 1.0.0\n"                
-            "作者: YOLO团队\n"            
-            "用于目标检测和分析的多功能工具"
-        )
-    
-    def show_help_manual_dialog(self):
-        """显示使用说明对话框"""
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(
-            self,
-            "使用说明",
-            "使用步骤:\n"                                  
-            "1. 首先加载YOLO模型\n"                        
-            "2. 打开图片、视频文件或摄像头\n"             
-            "3. 调整推理参数（置信度、IOU等）\n"          
-            "4. 点击开始按钮进行目标检测\n"                
-            "5. 可随时暂停/继续或停止检测\n"               
-            "6. 使用保存按钮保存当前截图"
-        )
-    
-    def show_detect_settings_dialog(self):
-        """显示检测设置对话框"""
-        # 这里只是一个简单的实现，后续可以根据需要扩展
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(
-            self,
-            "检测设置",
-            "检测设置功能正在开发中..."
-        )
 
 
 # ============================================================================

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Union, Dict, Any, List, Optional, Tuple
 from ultralytics import YOLO
 
-from baseDetect import baseDetect
+# from  import baseDetect
 
 # YOLO统一分析器实现 - 将预热功能集成到下面的UnifiedYOLO类中
 

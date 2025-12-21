@@ -476,7 +476,6 @@ class YOLOMainController(QObject):
         
         # 播放控制
         self.ui.left_panel_play_pause.connect(self.handle_play_pause)
-        # 删除_on_progress_updated方法，进度条已移除
         
         # 参数变化
         self.right_panel.iou_changed.connect(self.handle_iou_change)
@@ -563,7 +562,7 @@ class YOLOMainController(QObject):
     # ============================================================================
     
     def handle_load_model(self):
-        """加载模型（与原逻辑相同）"""
+        """加载模型"""
         try:
             model_filter = AppConfig.FILE_SETTINGS['file_filters']['model']
             model_path, _ = QFileDialog.getOpenFileName(
@@ -820,22 +819,19 @@ class YOLOMainController(QObject):
         print(f"错误 [{title}]: {message}")
         traceback.print_exc()
     
-    # 参数更新方法（与原逻辑相同）"""
+    # 参数更新方法
     def handle_iou_change(self, value):
+        """处理IOU阈值变化"""
         self.default_params['iou_threshold'] = value
         if self.yolo_processor:
             self.yolo_processor.update_params(iou_threshold=value)
             self.detector_worker.update_parameters(iou_threshold=value)
     
     def handle_confidence_change(self, value):
-        """处理置信度阈值变化
-        
-        Args:
-            value: 新的置信度阈值
-        """
+        """处理置信度阈值变化"""
         self.default_params['confidence_threshold'] = value
         if self.yolo_processor:
-            success = self.yolo_processor.update_params(conf_threshold=value)  # 改为conf_threshold
+            success = self.yolo_processor.update_params(conf_threshold=value)
             self.detector_worker.update_parameters(confidence_threshold=value)
             
             if success:
@@ -844,9 +840,11 @@ class YOLOMainController(QObject):
                 print(f"错误 [更新置信度阈值失败]: 无效的阈值: {value}")
     
     def handle_delay_change(self, value):
+        """处理延迟变化"""
         self.default_params['delay_ms'] = value
     
     def handle_line_width_change(self, value):
+        """处理线宽变化"""
         self.default_params['line_width'] = value
         if self.yolo_processor:
             self.yolo_processor.update_params(line_width=value)
@@ -888,10 +886,11 @@ class YOLOMainController(QObject):
                 
         except Exception as e:
             self._show_error("保存截图失败", str(e))
-
+    
     def handle_detect_settings(self):
-        """检测设置 - 通过UI方法显示检测设置对话框"""
-        self.ui.show_detect_settings_dialog()
+        """检测设置"""
+        # 由UI直接处理对话框显示，这里只做业务逻辑处理
+        print("检测设置菜单被点击")
     
     def _show_model_type_dialog(self, model_path):
         """模型类型选择对话框"""
@@ -903,30 +902,38 @@ class YOLOMainController(QObject):
         # 保持原有逻辑
         pass
     
-    # 文件菜单处理方法
+    # ============================================================================
+    # 文件菜单处理方法（从UI接收信号）
+    # ============================================================================
+    
     def _on_file_init(self):
-        """初始化"""
-        reply = QMessageBox.question(
-            self.ui, "确认初始化", "是否要初始化所有设置？",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self._stop_all()
-            self._init_ui_state()
-            QMessageBox.information(self.ui, "初始化完成", "所有设置已重置")
+        """初始化 - 由UI调用，执行实际初始化逻辑"""
+        # 执行实际初始化逻辑
+        self._stop_all()
+        self._init_ui_state()
+        
+        # 通知UI显示完成对话框（通过UI的方法）
+        self.ui.show_init_complete_dialog()
+        print("系统已初始化")
     
     def _on_file_exit(self):
-        """退出 - 通过UI方法显示确认对话框"""
-        if self.ui.show_confirm_exit_dialog():
-            self._stop_all()
-            self.ui.close()
+        """退出 - 由UI调用，执行退出逻辑"""
+        # 执行退出前的清理工作
+        self._stop_all()
+        # 关闭窗口（UI方法）
+        self.ui.close()
+        print("程序退出")
     
-    # 帮助菜单处理方法
+    # ============================================================================
+    # 帮助菜单处理方法（从UI接收信号）
+    # ============================================================================
+    
     def _on_help_about(self):
-        """关于 - 通过UI方法显示关于对话框"""
-        self.ui.show_about_dialog()
+        """关于 - 由UI调用，执行额外逻辑"""
+        # UI已经显示了对话框，这里可以执行额外的逻辑（如记录日志）
+        print("用户查看了关于信息")
     
     def _on_help_manual(self):
-        """使用说明 - 通过UI方法显示使用说明对话框"""
-        self.ui.show_help_manual_dialog()
-
+        """使用说明 - 由UI调用，执行额外逻辑"""
+        # UI已经显示了对话框，这里可以执行额外的逻辑（如记录日志）
+        print("用户查看了使用说明")
