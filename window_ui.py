@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QToolBar, QSizePolicy, QMenu, QScrollArea,
                                QMessageBox, QTextBrowser, QDialog)
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QAction, QFont, QPainter
 from collections import OrderedDict
 
 
@@ -42,7 +42,7 @@ class UIContants:
     FILE_LABEL_MAX_WIDTH = 300    # 文件名标签最大宽度
     FILE_LABEL_WIDTH_OFFSET = 20  # 文件名标签宽度偏移
     
-    # 进度条常量
+    # 进度条常量（保留接口，后续可能开发）
     PROGRESS_RANGE = 1000         # 进度条范围
     
     # 字体常量
@@ -228,7 +228,7 @@ class LeftDisplayPanel(QWidget):
         self.filename_label.setFixedHeight(UIContants.FILE_LABEL_HEIGHT)
         self.filename_label.hide()  # 默认隐藏
         
-        # 创建视频控制部件（叠加层）
+        # 创建视频控制部件（叠加层）- 只显示文件名，移除进度条和时间显示
         self.video_control_widget = self._create_video_control_widget()
         self.video_control_widget.setObjectName("VideoControlWidget")
         self.video_control_widget.setParent(self.display_container)
@@ -236,34 +236,21 @@ class LeftDisplayPanel(QWidget):
         self.video_control_widget.raise_()  # 确保在最上层
     
     def _create_video_control_widget(self):
-        """创建视频控制部件（播放/暂停按钮）- 叠加层版本"""
+        """创建视频控制部件（仅文件名）- 叠加层版本"""
         control_widget = QWidget()
-        control_widget.setFixedHeight(UIContants.CONTROL_HEIGHT)
+        control_widget.setFixedHeight(UIContants.FILE_LABEL_HEIGHT)
         
         # 视频控制布局
         control_layout = QHBoxLayout(control_widget)
-        control_layout.setContentsMargins(UIContants.PADDING_MEDIUM, 0, UIContants.PADDING_MEDIUM, 0)
-        control_layout.setSpacing(UIContants.LAYOUT_SPACING)
+        control_layout.setContentsMargins(0, 0, 0, 0)
+        control_layout.setSpacing(0)
         
-        # 播放/暂停按钮
-        self.play_pause_button = QPushButton("▶")
-        self.play_pause_button.setObjectName("PlayPauseButton")
-        self.play_pause_button.setFixedSize(UIContants.PLAY_BUTTON_SIZE, UIContants.PLAY_BUTTON_SIZE)
-        self.play_pause_button.clicked.connect(self._on_play_pause_clicked)
+        # 播放状态标签（用于显示播放状态，但隐藏不显示）
+        self.status_label = QLabel("")
+        self.status_label.setFixedWidth(0)  # 设置为0宽度，隐藏
+        self.status_label.hide()
         
-        # 时间显示标签
-        self.time_label = QLabel("--:--")
-        self.time_label.setObjectName("TimeLabel")
-        self.time_label.setMinimumWidth(UIContants.TIME_LABEL_MIN_WIDTH)
-        self.time_label.setAlignment(Qt.AlignCenter)
-        
-        # 设置时间显示字体
-        font = QFont("Consolas", UIContants.TIME_FONT_SIZE)
-        self.time_label.setFont(font)
-        
-        # 添加到布局
-        control_layout.addWidget(self.play_pause_button)
-        control_layout.addWidget(self.time_label, 1)       # 占1份空间
+        control_layout.addWidget(self.status_label)
         
         return control_widget
     
@@ -275,7 +262,8 @@ class LeftDisplayPanel(QWidget):
     
     def _update_play_button_state(self):
         """更新播放按钮显示状态"""
-        self.play_pause_button.setText("⏸" if self.is_playing else "▶")
+        # 移除播放按钮相关代码
+        pass
     
     def resizeEvent(self, event):
         """重写resize事件，调整叠加控件位置"""
@@ -287,16 +275,10 @@ class LeftDisplayPanel(QWidget):
             # 最大宽度不超过容器宽度-20，且不超过300px
             self.filename_label.setFixedWidth(min(300, self.display_container.width() - 20))
         
-        # 更新视频控制部件位置（水平居中，底部固定位置）
+        # 更新视频控制部件位置（左上角，与文件名标签对齐）
         if self.video_control_widget.isVisible():
-            control_width = min(self.display_container.width() - 2 * UIContants.PADDING_MEDIUM, 
-                               UIContants.PLAY_BUTTON_SIZE + UIContants.TIME_LABEL_MIN_WIDTH + 200)  # 限制最大宽度
-            
-            # 计算水平居中位置
-            x = (self.display_container.width() - control_width) // 2
-            y = self.display_container.height() - UIContants.CONTROL_HEIGHT - UIContants.PADDING_SMALL  # 底部留白
-            
-            self.video_control_widget.setGeometry(x, y, control_width, UIContants.CONTROL_HEIGHT)
+            self.video_control_widget.move(10, 10)
+            self.video_control_widget.setFixedWidth(min(300, self.display_container.width() - 20))
             self.video_control_widget.raise_()  # 确保在最上层
     
     def _setup_style(self):
@@ -326,96 +308,8 @@ class LeftDisplayPanel(QWidget):
                 text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
             }}
             QWidget#VideoControlWidget {{
-                background-color: rgba(0, 0, 0, 0.85);  /* 半透明黑色控制栏 */
-                border-radius: 8px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }}
-            QPushButton#PlayPauseButton {{
-                background-color: rgba(0, 120, 215, 0.9);
-                color: white;
+                background-color: transparent;
                 border: none;
-                border-radius: 16px;
-                font-size: 14px;
-                font-weight: bold;
-                padding: 0;
-            }}
-            QPushButton#PlayPauseButton:hover {{
-                background-color: rgba(0, 120, 215, 1.0);
-            }}
-            QPushButton#PlayPauseButton:pressed {{
-                background-color: rgba(0, 90, 158, 0.9);
-            }}
-            QPushButton#PlayPauseButton:disabled {{
-                background-color: rgba(80, 80, 80, 0.5);
-                color: rgba(180, 180, 180, 0.8);
-            }}
-            
-            /* 进度条样式 */
-            QSlider#ProgressSlider::groove:horizontal {{
-                height: {0}px;
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #444444, 
-                    stop:1 #666666
-                );
-                border-radius: {1}px;
-            }}
-            QSlider#ProgressSlider::handle:horizontal {{
-                background: qradialgradient(
-                    cx:0.5, cy:0.5, radius:0.5,
-                    fx:0.5, fy:0.5,
-                    stop:0.6 #0078d7,
-                    stop:1.0 #005a9e
-                );
-                width: {2}px;
-                height: {3}px;
-                margin: -5px 0;
-                border-radius: {4}px;
-                border: 2px solid #ffffff;
-            }}
-            QSlider#ProgressSlider::handle:horizontal:hover {{
-                background: qradialgradient(
-                    cx:0.5, cy:0.5, radius:0.5,
-                    fx:0.5, fy:0.5,
-                    stop:0.6 #106ebe,
-                    stop:1.0 #004578
-                );
-                width: 18px;
-                height: 18px;
-                margin: -6px 0;
-                border-radius: 9px;
-            }}
-            QSlider#ProgressSlider::handle:horizontal:pressed {{
-                background: qradialgradient(
-                    cx:0.5, cy:0.5, radius:0.5,
-                    fx:0.5, fy:0.5,
-                    stop:0.6 #005a9e,
-                    stop:1.0 #003b6a
-                );
-            }}
-            QSlider#ProgressSlider:disabled::groove:horizontal {{
-                background: #333333;
-            }}
-            QSlider#ProgressSlider:disabled::handle:horizontal {{
-                background: #555555;
-                border: 2px solid #777777;
-            }}
-            
-            /* 时间显示样式 */
-            QLabel#TimeLabel {{
-                color: white;
-                background-color: rgba(0, 0, 0, 0.7);
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 4px 10px;
-                border-radius: 4px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }}
-            QLabel#TimeLabel:disabled {{
-                color: #aaaaaa;
-                background-color: rgba(40, 40, 40, 0.7);
-                border: 1px solid rgba(100, 100, 100, 0.2);
             }}
         """.format(
             6,  # 进度条槽高度
@@ -449,8 +343,7 @@ class LeftDisplayPanel(QWidget):
         if mode == "video":
             self.video_control_widget.show()
             self.set_controls_enabled(True)
-            self.is_playing = True  # 视频默认播放状态
-            self._update_play_button_state()
+            self.is_playing = False  # 视频默认不播放，等待点击开始
         else:
             self.video_control_widget.hide()
             self.set_controls_enabled(False)
@@ -486,17 +379,17 @@ class LeftDisplayPanel(QWidget):
         Args:
             enabled: 是否启用控制部件
         """
-        self.play_pause_button.setEnabled(enabled)
-        self.time_label.setEnabled(enabled)
+        # 移除播放按钮相关代码
+        pass
     
     def set_play_state(self, is_playing: bool):
-        """设置播放状态并更新播放按钮
+        """设置播放状态
         
         Args:
             is_playing: 是否正在播放
         """
         self.is_playing = is_playing
-        self._update_play_button_state()
+        # 移除播放按钮相关代码
 
 
 # ============================================================================
@@ -1212,7 +1105,7 @@ class YOLOMainWindowUI(QMainWindow):
     
     def update_time_display(self, current_time, total_time):
         """更新时间显示"""
-        # 原方法，现在可能不需要了
+        # 原方法，现在不需要了
         pass
     
     def set_play_state(self, is_playing):

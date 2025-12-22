@@ -11,6 +11,8 @@ from typing import Optional, Dict, Any
 from PySide6.QtCore import QThread, Signal, Slot, QMutex, QWaitCondition
 from PySide6.QtGui import QImage
 import numpy as np
+import cv2
+from baseDetect import BaseDetect  # 导入BaseDetect渲染器
 
 
 class DetectorWorker(QThread):
@@ -75,6 +77,7 @@ class DetectorWorker(QThread):
         finally:
             self.mutex.unlock()
     
+    @Slot(dict)
     def update_parameters(self, **params):
         """更新推理参数"""
         self.mutex.lock()
@@ -83,15 +86,15 @@ class DetectorWorker(QThread):
                 # 处理参数名映射
                 yolo_params = {}
                 if 'iou_threshold' in params:
-                    yolo_params['iou'] = params['iou_threshold']
+                    yolo_params['iou_threshold'] = params['iou_threshold']  # 使用正确的参数名
                 if 'confidence_threshold' in params:
-                    yolo_params['conf'] = params['confidence_threshold']  # 改为conf
+                    yolo_params['conf_threshold'] = params['confidence_threshold']  # 将confidence_threshold映射为conf_threshold
                 if 'line_width' in params:
                     yolo_params['line_width'] = params['line_width']
                 
                 # 如果有其他参数，直接添加（向后兼容）
                 for key, value in params.items():
-                    if key not in ['iou_threshold', 'confidence_threshold']:
+                    if key not in ['iou_threshold', 'confidence_threshold', 'line_width']:
                         yolo_params[key] = value
                 
                 success = self.yolo_processor.update_params(**yolo_params)
@@ -231,6 +234,9 @@ class DetectorWorker(QThread):
         """线程主循环"""
         self.status_updated.emit("推理工作器线程启动")
         
+        # 创建BaseDetect渲染器实例
+        render_controller = BaseDetect()
+        
         while not self.stop_requested:
             # 检查暂停状态
             self.mutex.lock()
@@ -269,7 +275,7 @@ class DetectorWorker(QThread):
                     self._emit_original_frame(frame)
                     continue
                 
-                # 处理帧
+                # 处理帧（仅推理，不渲染）
                 result = self.yolo_processor.process_frame(frame)
                 
                 inference_time = time.time() - inference_start
@@ -278,9 +284,26 @@ class DetectorWorker(QThread):
                 
                 # 处理结果
                 if isinstance(result, dict):
-                    # 提取处理后的图像和统计信息
-                    processed_image = result.get('image', frame)
+                    # 提取推理数据和统计信息
                     stats_data = result.get('stats', {})
+                    
+                    # 使用BaseDetect进行渲染 - 构建符合要求的参数格式
+                    # 修复：从result中获取动态的 data_type，如果获取不到默认为 'detection'
+                    analyzer_result = {
+                        'success': True,
+                        'raw_image': frame,
+                        'data_type': result.get('data_type', 'detection'),  # 修复：使用动态类型
+                        'processed_data': result.get('processed_data', result),
+                        'stats': stats_data,
+                        'model_info': result.get('model_info', {})
+                    }
+                    
+                    # 确保只传递一个参数给render方法
+                    try:
+                        processed_image = render_controller.render(analyzer_result)
+                    except Exception as e:
+                        print(f"渲染错误: {str(e)}")
+                        processed_image = frame  # 失败时使用原始帧
                     
                     # 添加推理时间到统计
                     stats_data['inference_time'] = inference_time * 1000  # 转换为毫秒

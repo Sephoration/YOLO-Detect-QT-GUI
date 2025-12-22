@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QMessageBox, QFileDialog
 
 from window_ui import YOLOMainWindowUI
 from detector_worker import DetectorWorker
+from baseDetect import BaseDetect  # 导入BaseDetect渲染器
 from yolo_analyzer import UnifiedYOLO
 from config import AppConfig
 
@@ -475,7 +476,7 @@ class YOLOMainController(QObject):
         self.right_panel.save_screenshot.connect(self.handle_save_screenshot)
         
         # 播放控制
-        self.ui.left_panel_play_pause.connect(self.handle_play_pause)
+        self.left_panel.play_pause_clicked.connect(self.handle_play_pause)
         
         # 参数变化
         self.right_panel.iou_changed.connect(self.handle_iou_change)
@@ -892,15 +893,7 @@ class YOLOMainController(QObject):
         # 由UI直接处理对话框显示，这里只做业务逻辑处理
         print("检测设置菜单被点击")
     
-    def _show_model_type_dialog(self, model_path):
-        """模型类型选择对话框"""
-        # 保持原有逻辑
-        pass
-    
-    def _select_model_type(self, model_type, model_path, dialog):
-        """选择模型类型"""
-        # 保持原有逻辑
-        pass
+
     
     # ============================================================================
     # 文件菜单处理方法（从UI接收信号）

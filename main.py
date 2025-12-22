@@ -28,7 +28,6 @@ def main():
         app.setStyle("Fusion")
 
         # 创建UI窗口
-        print(f"{APP_INFO} 启动中...")
         ui_window = YOLOMainWindowUI()
         
         # 创建逻辑控制器并连接UI
