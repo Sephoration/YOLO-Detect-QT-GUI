@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(cmake -B build -DCMAKE_PREFIX_PATH=\"C:/Qt/6.7.3/mingw_64\" -G \"MinGW Makefiles\")",
+      "Read(//c//**)",
+      "Bash(cmake -B build -DCMAKE_PREFIX_PATH=\"C:/A_Toolkit/Qt/6.11.1/mingw_64\" -G \"MinGW Makefiles\")",
+      "Bash(cmake *)",
+      "Bash(\"C:/A_Toolkit/Qt/Tools/mingw1310_64/bin/mingw32-make.exe\" -C build clean)",
+      "Bash(C:/A_Toolkit/Qt/Tools/mingw1310_64/bin/mingw32-make.exe *)",
+      "Bash(tasklist)"
+    ]
+  }
+}
