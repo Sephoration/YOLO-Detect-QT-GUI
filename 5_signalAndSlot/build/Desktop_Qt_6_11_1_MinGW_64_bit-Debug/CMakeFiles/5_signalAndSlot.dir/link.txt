@@ -1,3 +1,0 @@
-C:\Users\Eplis\scoop\apps\cmake\current\bin\cmake.exe -E rm -f CMakeFiles\5_signalAndSlot.dir/objects.a
-C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\ar.exe qc CMakeFiles\5_signalAndSlot.dir/objects.a @CMakeFiles\5_signalAndSlot.dir\objects1.rsp
-C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\g++.exe -g -mwindows -Wl,--whole-archive CMakeFiles\5_signalAndSlot.dir/objects.a -Wl,--no-whole-archive -o 5_signalAndSlot.exe -Wl,--out-implib,lib5_signalAndSlot.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\5_signalAndSlot.dir\linkLibs.rsp

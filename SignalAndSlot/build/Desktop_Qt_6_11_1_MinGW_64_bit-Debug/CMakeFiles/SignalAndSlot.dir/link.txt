@@ -1,3 +1,0 @@
-C:\Users\Eplis\scoop\apps\cmake\current\bin\cmake.exe -E rm -f CMakeFiles\SignalAndSlot.dir/objects.a
-C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\ar.exe qc CMakeFiles\SignalAndSlot.dir/objects.a @CMakeFiles\SignalAndSlot.dir\objects1.rsp
-C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\g++.exe -g -mwindows -Wl,--whole-archive CMakeFiles\SignalAndSlot.dir/objects.a -Wl,--no-whole-archive -o SignalAndSlot.exe -Wl,--out-implib,libSignalAndSlot.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\SignalAndSlot.dir\linkLibs.rsp
