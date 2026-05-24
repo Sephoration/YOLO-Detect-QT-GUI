@@ -1,0 +1,5 @@
+C:/Git_Code/something_Qt/car_hmi/build/Desktop_Qt_6_11_1_MinGW_64_bit-Debug/CMakeFiles/CarHMI.dir
+C:/Git_Code/something_Qt/car_hmi/build/Desktop_Qt_6_11_1_MinGW_64_bit-Debug/CMakeFiles/edit_cache.dir
+C:/Git_Code/something_Qt/car_hmi/build/Desktop_Qt_6_11_1_MinGW_64_bit-Debug/CMakeFiles/rebuild_cache.dir
+C:/Git_Code/something_Qt/car_hmi/build/Desktop_Qt_6_11_1_MinGW_64_bit-Debug/CMakeFiles/CarHMI_autogen_timestamp_deps.dir
+C:/Git_Code/something_Qt/car_hmi/build/Desktop_Qt_6_11_1_MinGW_64_bit-Debug/CMakeFiles/CarHMI_autogen.dir

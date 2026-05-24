@@ -1,0 +1,3 @@
+C:\Users\Eplis\scoop\apps\cmake\current\bin\cmake.exe -E rm -f CMakeFiles\CustomSignalAndSlot.dir/objects.a
+C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\ar.exe qc CMakeFiles\CustomSignalAndSlot.dir/objects.a @CMakeFiles\CustomSignalAndSlot.dir\objects1.rsp
+C:\A_Toolkit\Qt\Tools\mingw1310_64\bin\g++.exe -g -mwindows -Wl,--whole-archive CMakeFiles\CustomSignalAndSlot.dir/objects.a -Wl,--no-whole-archive -o CustomSignalAndSlot.exe -Wl,--out-implib,libCustomSignalAndSlot.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\CustomSignalAndSlot.dir\linkLibs.rsp

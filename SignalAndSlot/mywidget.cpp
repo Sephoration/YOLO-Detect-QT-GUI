@@ -7,7 +7,6 @@ MyWidget::MyWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-
     connect(ui -> btn_max , &QPushButton::clicked , this , &QWidget::showMaximized ) ;
     connect(ui -> btn_min , &QPushButton::clicked , this , &QWidget::showMinimized ) ;
     connect(ui -> btn_normal , &QPushButton::clicked , this , &QWidget::showNormal ) ;
