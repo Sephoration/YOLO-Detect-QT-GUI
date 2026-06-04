@@ -6,7 +6,6 @@
 #include "commander.h"
 #include "soldier.h"
 
-
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class Widget;
@@ -21,12 +20,15 @@ public:
     explicit Widget(QWidget *parent = nullptr);
     ~Widget() override;
 
+public slots:
+    void onBtnsClicked();
+
 private:
     Ui::Widget *ui;
 
-
     Commander *commander;
-    Soldier *soldier;
-
+    Soldier   *soldier;
+    Soldier   *soldier2;
 };
+
 #endif // WIDGET_H

@@ -9,13 +9,10 @@ class Soldier : public QObject
 public:
     explicit Soldier(QObject *parent = nullptr);
 
-signals:
-
-// 定义槽函数
 public slots:
-    void fight() ;
-    void fight(QString s) ;
-
+    void fight();
+    void fight(QString s);
+    void escape();
 };
 
 #endif // SOLDIER_H
