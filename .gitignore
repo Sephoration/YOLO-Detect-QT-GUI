@@ -2,5 +2,3 @@ build/
 *.user
 *.user.*
 *.autosave
-
-.claude/
