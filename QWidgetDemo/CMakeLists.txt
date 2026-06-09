@@ -11,6 +11,7 @@ qt_add_executable(QWidgetDemo
     widget.cpp
     widget.h
     widget.ui
+    res.qrc
 )
 
 target_link_libraries(QWidgetDemo

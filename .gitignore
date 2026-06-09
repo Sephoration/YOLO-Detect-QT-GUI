@@ -1,4 +1,8 @@
 build/
+.qtcreator/
+.claude/
+__pycache__/
+*.pyc
 *.user
 *.user.*
 *.autosave
