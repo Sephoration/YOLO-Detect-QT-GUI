@@ -12,6 +12,8 @@ qt_add_executable(QWidgetDemo
     widget.h
     widget.ui
     res.qrc
+    fontform.h fontform.cpp fontform.ui
+    colorform.h colorform.cpp colorform.ui
 )
 
 target_link_libraries(QWidgetDemo
